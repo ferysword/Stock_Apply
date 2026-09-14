@@ -1,0 +1,131 @@
+rules_version = '2';
+
+// Collections :
+//   admins/{uid}        compte admin (créé à la main dans la console Firebase)
+//   private/access      { key } clé secrète contenue dans le QR code bénévoles
+//   devices/{uid}       téléphone bénévole du jour { key, firstName, lastName, day, createdAt, expiresAt }
+//   shifts/{id}         présence : un document par scan du QR code { uid, firstName, lastName, day, createdAt }
+//   products/{id}       { name, price (centimes), stock, threshold, order, active, image, lastSaleId }
+//   sales/{id}          { productId, productName, unitPrice, qty, total, payment, createdAt, deviceId, volunteerName }
+//   closures/{day}      clôture d'une journée (4h -> 4h), calculée par l'interface admin
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function accessKey() {
+      return get(/databases/$(database)/documents/private/access).data.key;
+    }
+
+    function isName(value) {
+      return value is string && value.size() >= 1 && value.size() <= 40;
+    }
+
+    // Bénévole = téléphone enregistré avec la clé du QR code actuel, pour la journée en cours (expire à 4h)
+    function isVolunteer() {
+      let path = /databases/$(database)/documents/devices/$(request.auth.uid);
+      return signedIn()
+        && exists(path)
+        && get(path).data.key == accessKey()
+        && request.time < get(path).data.expiresAt;
+    }
+
+    function isSeller() {
+      return isAdmin() || isVolunteer();
+    }
+
+    // Une vente doit être accompagnée de la baisse de stock correspondante (même batch)
+    function isValidSale(saleId) {
+      let sale = request.resource.data;
+      let productPath = /databases/$(database)/documents/products/$(sale.productId);
+      let before = get(productPath).data;
+      let after = getAfter(productPath).data;
+      return sale.keys().hasOnly(['productId', 'productName', 'unitPrice', 'qty', 'total', 'payment', 'createdAt', 'deviceId', 'volunteerName'])
+        && sale.keys().hasAll(['productId', 'productName', 'unitPrice', 'qty', 'total', 'payment', 'createdAt', 'deviceId', 'volunteerName'])
+        && sale.productName is string
+        && sale.qty is int && sale.qty >= 1 && sale.qty <= 99
+        && sale.unitPrice == before.price
+        && sale.total == sale.qty * sale.unitPrice
+        && sale.payment in ['card', 'cash']
+        && sale.createdAt == request.time
+        && sale.deviceId == request.auth.uid
+        && sale.volunteerName is string && sale.volunteerName.size() <= 90
+        && after.lastSaleId == saleId
+        && after.stock == before.stock - sale.qty;
+    }
+
+    // Un bénévole ne peut modifier un produit que pour décrémenter le stock d'une nouvelle vente
+    function isSaleStockUpdate(productId) {
+      let saleId = request.resource.data.lastSaleId;
+      let sale = getAfter(/databases/$(database)/documents/sales/$(saleId)).data;
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'lastSaleId'])
+        && saleId is string
+        && !exists(/databases/$(database)/documents/sales/$(saleId))
+        && sale.productId == productId
+        && request.resource.data.stock == resource.data.stock - sale.qty;
+    }
+
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /private/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /devices/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['key', 'firstName', 'lastName', 'day', 'createdAt', 'expiresAt'])
+        && request.resource.data.key == accessKey()
+        && isName(request.resource.data.firstName)
+        && isName(request.resource.data.lastName)
+        && request.resource.data.day is string
+        && request.resource.data.day.size() == 10
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(25, 'h');
+      allow delete: if isAdmin();
+    }
+
+    match /shifts/{shiftId} {
+      allow read, delete: if isAdmin();
+      // Créé dans le même batch que l'enregistrement du téléphone (qui vérifie la clé du QR code)
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'firstName', 'lastName', 'day', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/devices/$(request.auth.uid)).data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/devices/$(request.auth.uid)).data.firstName == request.resource.data.firstName
+        && getAfter(/databases/$(database)/documents/devices/$(request.auth.uid)).data.lastName == request.resource.data.lastName
+        && getAfter(/databases/$(database)/documents/devices/$(request.auth.uid)).data.day == request.resource.data.day;
+    }
+
+    match /products/{productId} {
+      allow read: if isSeller();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isVolunteer() && isSaleStockUpdate(productId));
+    }
+
+    match /sales/{saleId} {
+      allow read, delete: if isAdmin();
+      allow create: if isSeller() && isValidSale(saleId);
+      allow update: if false;
+    }
+
+    match /closures/{day} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
