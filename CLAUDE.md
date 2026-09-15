@@ -61,7 +61,7 @@ Dans `App.jsx`, `StaffGuard` protège `/admin` et `AdminOnly` renvoie un gestion
 
 ## Design
 
-- Charte du club, reprise de la maquette Claude Design (zip non versionné à la racine) : jaune `#F2CA07`, noir `#1D1D1D`.
+- Charte du club, reprise de la maquette Claude Design : jaune `#F2CA07`, noir `#1D1D1D`.
 - Variables `--mvb-*`, composants et mises en page dans `src/styles.css` ; pas de styles en ligne.
 - Titres en Barlow Condensed 700 majuscules, texte en Inter (Google Fonts dans `index.html`).
 - Jamais de texte blanc sur le jaune. Aucun emoji. Paiement : Carte en noir, Espèces en jaune.
@@ -72,4 +72,4 @@ Dans `App.jsx`, `StaffGuard` protège `/admin` et `AdminOnly` renvoie un gestion
 
 - Tout est en français : interface, commentaires, messages de commit.
 - Commits au nom de l'utilisateur uniquement, sans ligne `Co-Authored-By`.
-- Non versionnés volontairement : modif locale de `vite.config.js`, zip de maquette, `coca.png`, `logo-mvb-blason.png`, `docs/`.
+- Non versionnés volontairement : modif locale de `vite.config.js`, `docs/`.
