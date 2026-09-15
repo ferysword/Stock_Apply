@@ -7,10 +7,11 @@ import { useSession } from '../lib/session'
 import { useProducts } from '../lib/useProducts'
 import { businessDay, formatDay } from '../lib/day'
 import { PAYMENT_LABELS, describeError, formatEuros } from '../lib/format'
-import { FullPageSpinner, Spinner } from '../components/Spinner'
+import { FullPageSpinner } from '../components/Spinner'
 import ProductImage from '../components/ProductImage'
 import StockBadge from '../components/StockBadge'
 import Modal from '../components/Modal'
+import Crest from '../components/Crest'
 
 export default function Sell() {
   const { loading, user, isAdmin } = useSession()
@@ -54,14 +55,14 @@ function VolunteerGate({ user }) {
   const expired = !device.data || device.data.expiresAt.toMillis() <= now
   if (expired) {
     return (
-      <main className="center-page">
-        <div className="card narrow">
-          <h1>{device.data ? 'Journée terminée' : 'Accès non valide'}</h1>
-          <p className="muted">Scanne le QR code de la buvette pour commencer une nouvelle journée.</p>
-          <button className="btn block" onClick={quit}>
-            Fermer
-          </button>
-        </div>
+      <main className="day-over">
+        <Crest size={88} />
+        <h1>{device.data ? 'Journée terminée' : 'Accès non valide'}</h1>
+        <div className="bar" />
+        <p>Scanne le QR code de la buvette pour commencer une nouvelle journée.</p>
+        <button className="btn primary" onClick={quit}>
+          Fermer
+        </button>
       </main>
     )
   }
@@ -109,51 +110,74 @@ function SellScreen({ user, volunteerName, onQuit }) {
     })
   }
 
+  const denied = error?.code === 'permission-denied'
+
   return (
     <div className="sell">
       <header className="sell-bar">
+        <Crest size={34} decorative />
         <div className="sell-id">
-          <span className="brand">{volunteerName}</span>
-          <span className="who">{formatDay(businessDay(), { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+          <span className="sell-name">{volunteerName}</span>
+          <span className="sell-date">{formatDay(businessDay())}</span>
         </div>
-        <span className="spacer" />
         {onQuit ? (
-          <button className="btn small ghost" onClick={onQuit}>
+          <button className="btn dark-outline" onClick={onQuit}>
             Quitter
           </button>
         ) : (
-          <Link className="btn small" to="/admin">
+          <Link className="btn dark-outline" to="/admin">
             Admin
           </Link>
         )}
       </header>
 
-      {loading ? (
-        <Spinner />
-      ) : error ? (
-        <div className="center-block">
-          <p className="alert error">
-            {error.code === 'permission-denied'
-              ? 'Accès expiré. Scanne à nouveau le QR code de la buvette.'
-              : `Impossible de charger les produits : ${error.message}`}
-          </p>
-        </div>
-      ) : visible.length === 0 ? (
-        <p className="empty">Aucun produit disponible.</p>
-      ) : (
-        <div className="tiles">
-          {visible.map((p) => (
-            <button key={p.id} className={`tile${p.stock <= 0 ? ' out' : ''}`} onClick={() => setSelected(p)}>
-              <span className="tile-badge">
-                <StockBadge product={p} compact />
-              </span>
-              <ProductImage product={p} className="tile-logo" />
-              <span className="tile-name">{p.name}</span>
-              <span className="tile-price">{formatEuros(p.price)}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="sell-body">
+        {loading ? (
+          <div className="tiles" role="status" aria-label="Chargement">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="tile skeleton">
+                <span className="tile-logo" />
+                <span className="sk-line" />
+                <span className="sk-price" />
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="state-card error">
+            <h2>{denied ? 'Accès expiré' : 'Connexion perdue'}</h2>
+            <p>
+              {denied
+                ? 'Scanne à nouveau le QR code de la buvette.'
+                : 'Impossible de charger les produits. Vérifie le réseau.'}
+            </p>
+            {!denied && (
+              <button className="btn secondary lg" onClick={() => window.location.reload()}>
+                Réessayer
+              </button>
+            )}
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="state-card">
+            <div className="state-icon" />
+            <h2>Aucun produit</h2>
+            <p>Aucun produit n'est disponible pour l'instant. Préviens un responsable.</p>
+          </div>
+        ) : (
+          <>
+            <div className="tiles">
+              {visible.map((p) => (
+                <button key={p.id} className={`tile${p.stock <= 0 ? ' out' : ''}`} onClick={() => setSelected(p)}>
+                  <StockBadge product={p} compact />
+                  <ProductImage product={p} className="tile-logo" />
+                  <span className="tile-name">{p.name}</span>
+                  <span className="tile-price">{formatEuros(p.price)}</span>
+                </button>
+              ))}
+            </div>
+            <p className="sell-hint">Touche un produit pour enregistrer une vente.</p>
+          </>
+        )}
+      </div>
 
       {selected && (
         <SaleSheet
@@ -179,12 +203,12 @@ function SaleSheet({ product, onClose, onConfirm }) {
     <Modal label={product.name} onClose={onClose} sheet>
       <div className="sheet-head">
         <ProductImage product={product} className="sheet-logo" />
-        <div>
+        <div className="sheet-id">
           <div className="sheet-title">{product.name}</div>
           <div className="muted">{formatEuros(product.price)} l'unité</div>
         </div>
-        <button className="btn ghost small close" onClick={onClose} aria-label="Fermer">
-          Fermer
+        <button className="close-btn" onClick={onClose} aria-label="Fermer">
+          ×
         </button>
       </div>
 
@@ -193,7 +217,7 @@ function SaleSheet({ product, onClose, onConfirm }) {
           −
         </button>
         <output aria-live="polite">{qty}</output>
-        <button onClick={() => setQty((q) => Math.min(99, q + 1))} aria-label="Plus">
+        <button className="plus" onClick={() => setQty((q) => Math.min(99, q + 1))} aria-label="Plus">
           +
         </button>
       </div>
@@ -219,6 +243,7 @@ function SaleSheet({ product, onClose, onConfirm }) {
           Espèces
         </button>
       </div>
+      <p className="sheet-note">Un appui enregistre la vente.</p>
     </Modal>
   )
 }

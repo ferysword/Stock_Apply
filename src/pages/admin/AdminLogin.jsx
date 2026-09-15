@@ -3,6 +3,7 @@ import { Navigate } from 'react-router'
 import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { auth } from '../../firebase'
 import { useSession } from '../../lib/session'
+import Crest from '../../components/Crest'
 
 function loginError(err) {
   switch (err.code) {
@@ -53,47 +54,65 @@ export default function AdminLogin() {
   }
 
   return (
-    <main className="center-page">
-      <form className="card narrow" onSubmit={submit}>
-        <h1>Administration</h1>
-        {notAdmin && (
-          <p className="alert error">
-            Le compte {user.email} n'est pas administrateur.{' '}
-            <button type="button" className="link" onClick={() => signOut(auth)}>
-              Se déconnecter
-            </button>
-          </p>
-        )}
-        {message && <p className={`alert ${message.type}`}>{message.text}</p>}
-        <label className="field">
-          <span>E-mail</span>
-          <input
-            className="input"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="username"
-            required
-          />
-        </label>
-        <label className="field">
-          <span>Mot de passe</span>
-          <input
-            className="input"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        <button className="btn primary block" disabled={busy || loading}>
-          {busy || loading ? 'Connexion…' : 'Se connecter'}
-        </button>
-        <button type="button" className="link center" onClick={resetPassword}>
-          Mot de passe oublié
-        </button>
-      </form>
+    <main className="login">
+      <aside className="login-brand">
+        <Crest size={92} />
+        <div>
+          <h1>
+            Buvette
+            <br />
+            admin
+          </h1>
+          <div className="bar" />
+          <p>Ventes, clôtures, produits et accès bénévoles du MVB.</p>
+        </div>
+      </aside>
+
+      <div className="login-side">
+        <form className="login-form" onSubmit={submit}>
+          <h2>Se connecter</h2>
+          {notAdmin && (
+            <p className="alert error">
+              <span className="alert-text">
+                Le compte {user.email} n'est pas administrateur.{' '}
+                <button type="button" className="link" onClick={() => signOut(auth)}>
+                  Se déconnecter
+                </button>
+              </span>
+            </p>
+          )}
+          {message && <p className={`alert ${message.type}`}>{message.text}</p>}
+          <label className="field">
+            <span>E-mail</span>
+            <input
+              className="input lg"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="prenom.nom@mvb.fr"
+              autoComplete="username"
+              required
+            />
+          </label>
+          <label className="field">
+            <span>Mot de passe</span>
+            <input
+              className="input lg"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          <button className="btn primary lg block" disabled={busy || loading}>
+            {busy || loading ? 'Connexion…' : 'Se connecter'}
+          </button>
+          <button type="button" className="link" onClick={resetPassword}>
+            Mot de passe oublié
+          </button>
+        </form>
+      </div>
     </main>
   )
 }

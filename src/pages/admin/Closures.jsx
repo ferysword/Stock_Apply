@@ -9,6 +9,15 @@ import { Spinner } from '../../components/Spinner'
 
 const time = (ts) => ts?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) ?? '—'
 
+function Figure({ label, value }) {
+  return (
+    <div className="figure">
+      <span className="label">{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
 export default function Closures() {
   const today = businessDay()
   const [closures, setClosures] = useState({ loading: true, list: [] })
@@ -65,72 +74,58 @@ export default function Closures() {
   )
 
   return (
-    <section>
-      <div className="page-head">
-        <h1>Clôtures</h1>
-        {syncing && <span className="muted">Clôture des journées terminées…</span>}
-      </div>
+    <section className="stack">
+      {syncing && <p className="muted small-text">Clôture des journées terminées…</p>}
       {error && <p className="alert error">{error}</p>}
 
       <div className="panel current-day">
-        <div className="page-head">
-          <div>
-            <h2>Journée en cours</h2>
-            <p className="muted">{formatDay(today)} · se termine demain à 4h</p>
-          </div>
-          <button className="btn primary" onClick={() => run(today)} disabled={busyDay === today}>
-            {busyDay === today ? 'Clôture…' : 'Clôturer maintenant'}
-          </button>
+        <div className="current-day-id">
+          <span className="label">Journée en cours</span>
+          <h1>{formatDay(today)}</h1>
+          <span className="muted">se termine demain à 4 h</span>
         </div>
         <div className="mini-stats">
-          <div>
-            <span className="stat-label">Total</span>
-            <strong>{formatEuros(live.total)}</strong>
-          </div>
-          <div>
-            <span className="stat-label">Carte</span>
-            <strong>{formatEuros(live.card)}</strong>
-          </div>
-          <div>
-            <span className="stat-label">Espèces</span>
-            <strong>{formatEuros(live.cash)}</strong>
-          </div>
-          <div>
-            <span className="stat-label">Ventes</span>
-            <strong>{live.count}</strong>
-          </div>
+          <Figure label="Total" value={formatEuros(live.total)} />
+          <Figure label="Carte" value={formatEuros(live.card)} />
+          <Figure label="Espèces" value={formatEuros(live.cash)} />
+          <Figure label="Ventes" value={live.count} />
         </div>
+        <button className="btn primary lg" onClick={() => run(today)} disabled={busyDay === today}>
+          {busyDay === today ? 'Clôture…' : 'Clôturer maintenant'}
+        </button>
       </div>
 
       {closures.loading ? (
         <Spinner />
       ) : closures.list.length === 0 ? (
-        <p className="empty">Aucune clôture pour l'instant.</p>
+        <p className="panel empty">Aucune clôture pour l'instant.</p>
       ) : (
-        <div className="closure-list">
-          {closures.list.map((c) => (
-            <details key={c.day} className="closure" open={c.day === closures.list[0].day}>
-              <summary>
-                <div className="closure-title">
-                  <strong>{formatDay(c.day)}</strong>
-                  {!c.final && <span className="tag tag-warn">Provisoire</span>}
-                  <span className="muted">
-                    {c.volunteers.filter((v) => v.arrivedAt).length} présent(s) · {c.count} vente(s)
-                  </span>
-                </div>
-                <div className="closure-totals">
-                  <span className="tag tag-card">Carte {formatEuros(c.card)}</span>
-                  <span className="tag tag-cash">Espèces {formatEuros(c.cash)}</span>
-                  <strong>{formatEuros(c.total)}</strong>
-                </div>
-              </summary>
+        closures.list.map((c) => (
+          <details key={c.day} className="closure" open={c.day === closures.list[0].day}>
+            <summary>
+              <span className="closure-toggle" aria-hidden="true" />
+              <div className="closure-id">
+                <span className="closure-date">{formatDay(c.day)}</span>
+                <span className="muted small-text">
+                  {c.volunteers.filter((v) => v.arrivedAt).length} présent(s) · {c.count} vente(s)
+                </span>
+              </div>
+              {!c.final && <span className="tag tag-outline">Provisoire</span>}
+              <span className="spacer" />
+              <div className="closure-totals">
+                <Figure label="Carte" value={formatEuros(c.card)} />
+                <Figure label="Espèces" value={formatEuros(c.cash)} />
+                <Figure label="Total" value={formatEuros(c.total)} />
+              </div>
+            </summary>
 
-              <div className="closure-body">
+            <div className="closure-body">
+              <div>
                 <h3>Bénévoles</h3>
                 {c.volunteers.length === 0 ? (
                   <p className="muted">Aucun bénévole enregistré.</p>
                 ) : (
-                  <div className="table-wrap">
+                  <div className="table-box">
                     <table>
                       <thead>
                         <tr>
@@ -147,7 +142,7 @@ export default function Closures() {
                         {c.volunteers.map((v) => (
                           <tr key={v.name}>
                             <td>{v.name}</td>
-                            <td>{time(v.arrivedAt)}</td>
+                            <td className="muted">{time(v.arrivedAt)}</td>
                             <td className="num">{v.count}</td>
                             <td className="num">{v.units}</td>
                             <td className="num">{formatEuros(v.card)}</td>
@@ -159,12 +154,14 @@ export default function Closures() {
                     </table>
                   </div>
                 )}
+              </div>
 
+              <div>
                 <h3>Produits vendus</h3>
                 {c.products.length === 0 ? (
                   <p className="muted">Aucune vente.</p>
                 ) : (
-                  <div className="table-wrap">
+                  <div className="table-box">
                     <table>
                       <thead>
                         <tr>
@@ -182,26 +179,27 @@ export default function Closures() {
                             <td className="num">{p.qty}</td>
                             <td className="num">{formatEuros(p.card)}</td>
                             <td className="num">{formatEuros(p.cash)}</td>
-                            <td className="num">{formatEuros(p.total)}</td>
+                            <td className="num strong">{formatEuros(p.total)}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 )}
-
-                <div className="closure-foot">
-                  <span className="muted">
-                    Calculée le {c.closedAt?.toDate().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
-                  </span>
-                  <button className="btn small" onClick={() => run(c.day)} disabled={busyDay === c.day}>
-                    {busyDay === c.day ? 'Calcul…' : 'Recalculer'}
-                  </button>
-                </div>
               </div>
-            </details>
-          ))}
-        </div>
+
+              <div className="closure-foot">
+                <span className="muted">
+                  Calculée le {c.closedAt?.toDate().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
+                </span>
+                <span className="spacer" />
+                <button className="btn" onClick={() => run(c.day)} disabled={busyDay === c.day}>
+                  {busyDay === c.day ? 'Calcul…' : 'Recalculer'}
+                </button>
+              </div>
+            </div>
+          </details>
+        ))
       )}
     </section>
   )

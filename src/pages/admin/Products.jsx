@@ -16,7 +16,9 @@ import { resizeImage } from '../../lib/image'
 import { Spinner } from '../../components/Spinner'
 import ProductImage from '../../components/ProductImage'
 import StockBadge from '../../components/StockBadge'
-import Modal from '../../components/Modal'
+import Modal, { DialogHead } from '../../components/Modal'
+
+const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`
 
 export default function Products() {
   const { products, loading, error } = useProducts()
@@ -24,6 +26,7 @@ export default function Products() {
   const [restocking, setRestocking] = useState(null)
   const [bulk, setBulk] = useState(false)
   const nextOrder = products.reduce((max, p) => Math.max(max, p.order ?? 0), 0) + 10
+  const hiddenCount = products.filter((p) => !p.active).length
 
   async function remove(product) {
     if (!window.confirm(`Supprimer « ${product.name} » ?\nL'historique des ventes est conservé.`)) return
@@ -35,14 +38,20 @@ export default function Products() {
   }
 
   return (
-    <section>
+    <section className="stack">
       <div className="page-head">
         <h1>Produits</h1>
+        {products.length > 0 && (
+          <span className="muted">
+            {plural(products.length, 'produit')} · {plural(hiddenCount, 'masqué')}
+          </span>
+        )}
+        <span className="spacer" />
         <div className="head-actions">
-          <button className="btn" onClick={() => setBulk(true)} disabled={products.length === 0}>
+          <button className="btn md" onClick={() => setBulk(true)} disabled={products.length === 0}>
             Réappro groupé
           </button>
-          <button className="btn primary" onClick={() => setEditing('new')}>
+          <button className="btn primary md" onClick={() => setEditing('new')}>
             Ajouter un produit
           </button>
         </div>
@@ -53,28 +62,30 @@ export default function Products() {
       {loading ? (
         <Spinner />
       ) : products.length === 0 ? (
-        <p className="empty">Aucun produit pour l'instant. Commence par en ajouter un.</p>
+        <p className="panel empty">Aucun produit pour l'instant. Commence par en ajouter un.</p>
       ) : (
-        <div className="product-list">
+        <div className="panel flush">
           {products.map((p) => (
-            <div key={p.id} className={`product-row${p.active ? '' : ' inactive'}`}>
+            <div key={p.id} className="product-row">
               <ProductImage product={p} className="row-logo" />
               <div className="row-main">
-                <div className="row-name">
-                  {p.name}
-                  {!p.active && <span className="tag">Masqué</span>}
-                </div>
-                <div className="muted">{formatEuros(p.price)}</div>
+                <div className="row-name">{p.name}</div>
+                <div className="muted small-text">Ordre {p.order ?? 0}</div>
               </div>
-              <StockBadge product={p} />
+              <div className="row-price">{formatEuros(p.price)}</div>
+              <div className="row-tags">
+                <StockBadge product={p} />
+                {!p.active && <span className="tag">Masqué</span>}
+              </div>
+              <span className="spacer" />
               <div className="row-actions">
-                <button className="btn small" onClick={() => setRestocking(p)}>
+                <button className="btn" onClick={() => setRestocking(p)}>
                   Réappro
                 </button>
-                <button className="btn small" onClick={() => setEditing(p)}>
+                <button className="btn" onClick={() => setEditing(p)}>
                   Modifier
                 </button>
-                <button className="btn small ghost danger" onClick={() => remove(p)}>
+                <button className="btn danger" onClick={() => remove(p)}>
                   Supprimer
                 </button>
               </div>
@@ -128,61 +139,66 @@ function BulkRestockDialog({ products, onClose }) {
   }
 
   return (
-    <Modal label="Réappro groupé" onClose={onClose}>
+    <Modal label="Réappro groupé" onClose={onClose} wide>
       <form onSubmit={submit}>
-        <div className="dialog-head">
-          <h2>Réappro groupé</h2>
-        </div>
-        <div className="segmented" role="radiogroup">
-          <button type="button" className={mode === 'add' ? 'active' : ''} onClick={() => setMode('add')}>
-            Ajouter au stock
-          </button>
-          <button type="button" className={mode === 'count' ? 'active' : ''} onClick={() => setMode('count')}>
-            Stock compté
-          </button>
-        </div>
-        <p className="muted small-text">
-          {mode === 'add'
-            ? 'Saisis la quantité ajoutée pour chaque produit réapprovisionné.'
-            : 'Saisis la quantité réellement présente (inventaire). Évite de le faire pendant les ventes.'}
-        </p>
-        {error && <p className="alert error">{error}</p>}
+        <DialogHead title="Réappro groupé" onClose={onClose} />
+        <div className="dialog-body">
+          <div className="segmented lg" role="radiogroup">
+            <button type="button" className={mode === 'add' ? 'active' : ''} onClick={() => setMode('add')}>
+              Ajouter au stock
+            </button>
+            <button type="button" className={mode === 'count' ? 'active' : ''} onClick={() => setMode('count')}>
+              Stock compté
+            </button>
+          </div>
+          <p className="muted small-text">
+            {mode === 'add'
+              ? 'Saisis la quantité ajoutée pour chaque produit réapprovisionné.'
+              : 'Saisis la quantité réellement présente (inventaire). Évite de le faire pendant les ventes.'}
+          </p>
+          {error && <p className="alert error">{error}</p>}
 
-        <div className="bulk-list">
-          {products.map((p) => {
-            const raw = values[p.id] ?? ''
-            const n = Number(raw)
-            const preview = raw.trim() !== '' && Number.isInteger(n) ? (mode === 'add' ? p.stock + n : n) : null
-            return (
-              <label key={p.id} className="bulk-row">
-                <ProductImage product={p} className="bulk-logo" />
-                <span className="bulk-name">
-                  {p.name}
-                  <span className="muted">
-                    Stock : {p.stock}
-                    {preview !== null && ` → ${preview}`}
+          <div className="bulk-list">
+            {products.map((p) => {
+              const raw = values[p.id] ?? ''
+              const n = Number(raw)
+              const preview = raw.trim() !== '' && Number.isInteger(n) ? (mode === 'add' ? p.stock + n : n) : null
+              return (
+                <label key={p.id} className="bulk-row">
+                  <ProductImage product={p} className="bulk-logo" />
+                  <span className="bulk-name">
+                    {p.name}
+                    <span className="muted">
+                      Stock : {p.stock}
+                      {preview !== null && (
+                        <>
+                          {' → '}
+                          <strong>{preview}</strong>
+                        </>
+                      )}
+                    </span>
                   </span>
-                </span>
-                <input
-                  className="input bulk-input"
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputMode="numeric"
-                  value={raw}
-                  onChange={(e) => setValues((v) => ({ ...v, [p.id]: e.target.value }))}
-                  aria-label={`Quantité ${p.name}`}
-                />
-              </label>
-            )
-          })}
+                  <input
+                    className="input qty-input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    value={raw}
+                    onChange={(e) => setValues((v) => ({ ...v, [p.id]: e.target.value }))}
+                    aria-label={`Quantité ${p.name}`}
+                  />
+                </label>
+              )
+            })}
+          </div>
         </div>
 
         <div className="dialog-actions">
-          <button type="button" className="btn ghost" onClick={onClose}>
+          <button type="button" className="btn md" onClick={onClose}>
             Annuler
           </button>
-          <button className="btn primary" disabled={busy}>
+          <button className="btn primary md" disabled={busy}>
             {busy ? 'Enregistrement…' : 'Enregistrer'}
           </button>
         </div>
@@ -250,58 +266,57 @@ function ProductForm({ product, nextOrder, onClose }) {
     }
   }
 
-  return (
-    <Modal label={product ? 'Modifier le produit' : 'Nouveau produit'} onClose={onClose}>
-      <form onSubmit={submit}>
-        <div className="dialog-head">
-          <h2>{product ? 'Modifier le produit' : 'Nouveau produit'}</h2>
-        </div>
-        {error && <p className="alert error">{error}</p>}
+  const title = product ? 'Modifier le produit' : 'Nouveau produit'
 
-        <div className="form-grid">
-          <div className="field full">
-            <span>Logo</span>
-            <div className="image-field">
-              {form.image ? (
-                <img className="product-image image-preview" src={form.image} alt="" />
-              ) : (
-                <div className="image-preview empty-preview">Aucun</div>
+  return (
+    <Modal label={title} onClose={onClose}>
+      <form onSubmit={submit}>
+        <DialogHead title={title} onClose={onClose} />
+        <div className="dialog-body">
+          {error && <p className="alert error">{error}</p>}
+
+          <div className="image-field">
+            {form.image ? (
+              <img className="product-image image-preview" src={form.image} alt="" />
+            ) : (
+              <div className="image-preview empty-preview">Aucun logo</div>
+            )}
+            <div className="image-buttons">
+              <label className="btn">
+                Choisir une image
+                <input type="file" accept="image/*" onChange={pickImage} hidden />
+              </label>
+              {form.image && (
+                <button type="button" className="btn text" onClick={() => setForm((f) => ({ ...f, image: '' }))}>
+                  Retirer
+                </button>
               )}
-              <div className="image-buttons">
-                <label className="btn small">
-                  Choisir une image
-                  <input type="file" accept="image/*" onChange={pickImage} hidden />
-                </label>
-                {form.image && (
-                  <button type="button" className="btn small ghost" onClick={() => setForm((f) => ({ ...f, image: '' }))}>
-                    Retirer
-                  </button>
-                )}
-              </div>
             </div>
           </div>
 
-          <label className="field full">
+          <label className="field">
             <span>Nom</span>
             <input className="input" {...bind('name')} maxLength={60} required autoFocus />
           </label>
-          <label className="field">
-            <span>Prix (€)</span>
-            <input className="input" {...bind('price')} inputMode="decimal" placeholder="2,50" required />
-          </label>
-          <label className="field">
-            <span>{product ? 'Stock (correction inventaire)' : 'Stock initial'}</span>
-            <input className="input" {...bind('stock')} type="number" step="1" required />
-          </label>
-          <label className="field">
-            <span>Seuil d'alerte</span>
-            <input className="input" {...bind('threshold')} type="number" min="0" step="1" required />
-          </label>
-          <label className="field">
+          <div className="form-grid-3">
+            <label className="field">
+              <span>Prix (€)</span>
+              <input className="input" {...bind('price')} inputMode="decimal" placeholder="2,50" required />
+            </label>
+            <label className="field">
+              <span>{product ? 'Stock (inventaire)' : 'Stock initial'}</span>
+              <input className="input" {...bind('stock')} type="number" step="1" required />
+            </label>
+            <label className="field">
+              <span>Seuil d'alerte</span>
+              <input className="input" {...bind('threshold')} type="number" min="0" step="1" required />
+            </label>
+          </div>
+          <label className="field field-narrow">
             <span>Ordre d'affichage</span>
             <input className="input" {...bind('order')} type="number" step="1" required />
           </label>
-          <label className="checkbox full">
+          <label className="checkbox">
             <input
               type="checkbox"
               checked={form.active}
@@ -312,10 +327,10 @@ function ProductForm({ product, nextOrder, onClose }) {
         </div>
 
         <div className="dialog-actions">
-          <button type="button" className="btn ghost" onClick={onClose}>
+          <button type="button" className="btn md" onClick={onClose}>
             Annuler
           </button>
-          <button className="btn primary" disabled={busy}>
+          <button className="btn primary md" disabled={busy}>
             {busy ? 'Enregistrement…' : 'Enregistrer'}
           </button>
         </div>
@@ -346,35 +361,35 @@ function RestockDialog({ product, onClose }) {
   return (
     <Modal label="Réapprovisionner" onClose={onClose}>
       <form onSubmit={submit}>
-        <div className="dialog-head">
-          <h2>Réapprovisionner</h2>
-        </div>
-        <div className="restock-head">
-          <ProductImage product={product} className="row-logo" />
-          <div>
-            <div className="row-name">{product.name}</div>
-            <div className="muted">Stock actuel : {product.stock}</div>
+        <DialogHead title="Réapprovisionner" onClose={onClose} />
+        <div className="dialog-body">
+          <div className="restock-head">
+            <ProductImage product={product} className="row-logo" />
+            <div>
+              <div className="row-name">{product.name}</div>
+              <div className="muted">Stock actuel : {product.stock}</div>
+            </div>
           </div>
+          {error && <p className="alert error">{error}</p>}
+          <label className="field">
+            <span>Quantité ajoutée</span>
+            <input
+              className="input"
+              type="number"
+              min="1"
+              step="1"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              autoFocus
+              required
+            />
+          </label>
         </div>
-        {error && <p className="alert error">{error}</p>}
-        <label className="field">
-          <span>Quantité ajoutée</span>
-          <input
-            className="input"
-            type="number"
-            min="1"
-            step="1"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            autoFocus
-            required
-          />
-        </label>
         <div className="dialog-actions">
-          <button type="button" className="btn ghost" onClick={onClose}>
+          <button type="button" className="btn md" onClick={onClose}>
             Annuler
           </button>
-          <button className="btn primary" disabled={busy}>
+          <button className="btn primary md" disabled={busy}>
             Ajouter au stock
           </button>
         </div>

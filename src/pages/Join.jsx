@@ -7,6 +7,7 @@ import { useSession } from '../lib/session'
 import { businessDay, dayEnd, formatDay } from '../lib/day'
 import { getVolunteerIdentity, setVolunteerIdentity } from '../lib/volunteer'
 import { FullPageSpinner } from '../components/Spinner'
+import Crest from '../components/Crest'
 
 // Page ouverte par le QR code : #/b/<clé>
 export default function Join() {
@@ -16,6 +17,7 @@ export default function Join() {
   const [identity, setIdentity] = useState(getVolunteerIdentity)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [invalidKey, setInvalidKey] = useState(false)
   const day = businessDay()
 
   if (loading) return <FullPageSpinner />
@@ -50,32 +52,37 @@ export default function Join() {
       setVolunteerIdentity({ firstName, lastName })
       navigate('/vente', { replace: true })
     } catch (err) {
-      setError(
-        err.code === 'permission-denied'
-          ? "Ce QR code n'est plus valide. Demande le nouveau QR code à un responsable."
-          : `Connexion impossible : ${err.message}`,
-      )
+      if (err.code === 'permission-denied') {
+        setInvalidKey(true)
+        setError("Ce QR code n'est plus valide. Demande le nouveau QR code à un responsable.")
+      } else {
+        setError(`Connexion impossible : ${err.message}`)
+      }
       setBusy(false)
     }
   }
 
   return (
-    <main className="center-page">
-      <form className="card narrow" onSubmit={submit}>
+    <main className="join">
+      <form className="join-form" onSubmit={submit}>
+        <Crest size={64} />
         <h1>Bienvenue à la buvette</h1>
-        <div className="day-pill">Journée du {formatDay(day)}</div>
+        <div className="day-pill">Journée du {formatDay(day).toLowerCase()}</div>
         {error && <p className="alert error">{error}</p>}
-        <label className="field">
-          <span>Prénom</span>
-          <input className="input" {...bind('firstName')} maxLength={40} autoComplete="given-name" required />
-        </label>
-        <label className="field">
-          <span>Nom</span>
-          <input className="input" {...bind('lastName')} maxLength={40} autoComplete="family-name" required />
-        </label>
-        <button className="btn primary block" disabled={busy}>
-          {busy ? 'Connexion…' : 'Commencer ma journée'}
-        </button>
+        <fieldset className="join-fields" disabled={invalidKey}>
+          <label className="field">
+            <span>Prénom</span>
+            <input className="input xl" {...bind('firstName')} maxLength={40} autoComplete="given-name" required />
+          </label>
+          <label className="field">
+            <span>Nom</span>
+            <input className="input xl" {...bind('lastName')} maxLength={40} autoComplete="family-name" required />
+          </label>
+          <button className="btn primary xl block" disabled={busy || invalidKey}>
+            {busy ? 'Connexion…' : 'Commencer ma journée'}
+          </button>
+        </fieldset>
+        {!invalidKey && <p className="muted small-text">L'accès reste actif jusqu'à 4 h du matin.</p>}
       </form>
     </main>
   )

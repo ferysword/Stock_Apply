@@ -4,6 +4,7 @@ import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeB
 import { db } from '../../firebase'
 import { describeError } from '../../lib/format'
 import { Spinner } from '../../components/Spinner'
+import Crest from '../../components/Crest'
 
 function randomKey() {
   const bytes = crypto.getRandomValues(new Uint8Array(24))
@@ -81,92 +82,111 @@ export default function Access() {
 
   return (
     <section>
-      <div className="page-head no-print">
-        <h1>Accès bénévoles</h1>
-      </div>
-      {error && <p className="alert error no-print">{error}</p>}
+      <div className="stack no-print">
+        {error && <p className="alert error">{error}</p>}
 
-      <div className="access">
-        <div className="panel qr-card print-area">
-          {access.key ? (
-            <>
-              <h2>Buvette · Espace bénévoles</h2>
-              <QRCodeSVG value={joinUrl} size={280} marginSize={2} level="M" />
-              <p className="muted">
-                Scanne ce code avec l'appareil photo au début de chaque journée pour enregistrer les ventes.
-              </p>
-              <div className="qr-actions no-print">
-                <button className="btn small" onClick={() => window.print()}>
-                  Imprimer
+        <div className="access">
+          <div className="panel qr-card">
+            {access.key ? (
+              <>
+                <h2>Buvette · Espace bénévoles</h2>
+                <div className="qr-frame">
+                  <QRCodeSVG value={joinUrl} size={212} marginSize={0} level="M" />
+                </div>
+                <p className="muted">Scanne ce code avec l'appareil photo au début de chaque journée.</p>
+                <div className="qr-actions">
+                  <button className="btn" onClick={() => window.print()}>
+                    Imprimer
+                  </button>
+                  <button className="btn" onClick={copy}>
+                    {copied ? 'Lien copié' : 'Copier le lien'}
+                  </button>
+                  <button className="btn secondary" onClick={regenerate}>
+                    Nouveau QR code
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2>Aucun QR code</h2>
+                <p className="muted">Génère un QR code pour permettre aux bénévoles de se connecter.</p>
+                <button className="btn primary lg" onClick={regenerate}>
+                  Générer le QR code
                 </button>
-                <button className="btn small" onClick={copy}>
-                  {copied ? 'Lien copié' : 'Copier le lien'}
-                </button>
-                <button className="btn small ghost danger" onClick={regenerate}>
-                  Nouveau QR code
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2>Aucun QR code</h2>
-              <p className="muted">Génère un QR code pour permettre aux bénévoles de se connecter.</p>
-              <button className="btn primary" onClick={regenerate}>
-                Générer le QR code
-              </button>
-            </>
-          )}
-        </div>
-
-        <div className="panel no-print">
-          <div className="page-head">
-            <h2>Téléphones connectés</h2>
-            {expired.length > 0 && (
-              <button className="btn small ghost" onClick={purgeExpired}>
-                Nettoyer les expirés ({expired.length})
-              </button>
+              </>
             )}
           </div>
-          {devices.length === 0 ? (
-            <p className="empty">Aucun bénévole connecté.</p>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nom</th>
-                    <th>Connecté le</th>
-                    <th>Statut</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {devices.map((d) => (
-                    <tr key={d.id}>
-                      <td>
-                        {d.firstName} {d.lastName}
-                      </td>
-                      <td>{d.createdAt?.toDate().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                      <td>
-                        {isActive(d) ? (
-                          <span className="tag tag-ok">Actif</span>
-                        ) : (
-                          <span className="tag">Expiré</span>
-                        )}
-                      </td>
-                      <td className="num">
-                        <button className="btn small ghost danger" onClick={() => revoke(d)}>
-                          Retirer
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+          <div className="panel flush">
+            <div className="panel-head">
+              <h2>Téléphones connectés</h2>
+              {expired.length > 0 && (
+                <button className="btn" onClick={purgeExpired}>
+                  Nettoyer les expirés ({expired.length})
+                </button>
+              )}
             </div>
-          )}
+            {devices.length === 0 ? (
+              <p className="empty">Aucun bénévole connecté.</p>
+            ) : (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Nom</th>
+                      <th>Connecté le</th>
+                      <th>Statut</th>
+                      <th className="num">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {devices.map((d) => (
+                      <tr key={d.id}>
+                        <td className="strong">
+                          {d.firstName} {d.lastName}
+                        </td>
+                        <td className="muted">
+                          {d.createdAt?.toDate().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
+                        </td>
+                        <td>
+                          {isActive(d) ? <span className="tag tag-ok">Actif</span> : <span className="tag">Expiré</span>}
+                        </td>
+                        <td className="num">
+                          <button className="btn danger sm" onClick={() => revoke(d)}>
+                            Retirer
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {access.key && <Poster url={joinUrl} />}
     </section>
+  )
+}
+
+// Affiche A4 à coller à la buvette, visible uniquement à l'impression
+function Poster({ url }) {
+  return (
+    <div className="poster print-only">
+      <Crest size={130} />
+      <div className="poster-title">Buvette</div>
+      <div className="poster-band">Espace bénévoles</div>
+      <div className="poster-qr">
+        <QRCodeSVG value={url} size={330} marginSize={0} level="M" />
+      </div>
+      <p className="poster-lead">Scanne ce code avec l'appareil photo de ton téléphone au début de chaque journée.</p>
+      <p className="poster-sub">
+        Indique ton prénom et ton nom, puis enregistre chaque vente. L'accès se termine à 4 h du matin.
+      </p>
+      <span className="spacer" />
+      <div className="poster-foot">Montaigu-Vendée Boufféré Volley-Ball · 1969</div>
+    </div>
   )
 }

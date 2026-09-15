@@ -8,15 +8,29 @@ import { addDays, businessDay } from '../../lib/day'
 import { PAYMENT_LABELS, describeError, formatEuros } from '../../lib/format'
 import { Spinner } from '../../components/Spinner'
 
+const PRESETS = [
+  { label: "Aujourd'hui", daysBack: 0, span: 1 },
+  { label: 'Hier', daysBack: 1, span: 1 },
+  { label: '7 jours', daysBack: 0, span: 7 },
+]
+
+function presetRange({ daysBack, span }) {
+  const to = addDays(businessDay(), -daysBack)
+  return { from: addDays(to, -(span - 1)), to }
+}
+
+const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`
+
 function computeStats(sales) {
   const products = new Map()
   const volunteers = new Map()
-  const stats = { total: 0, card: 0, cash: 0, units: 0, count: sales.length }
+  const stats = { total: 0, card: 0, cash: 0, cardCount: 0, cashCount: 0, units: 0, count: sales.length }
 
   for (const s of sales) {
     stats.total += s.total
     stats.units += s.qty
     stats[s.payment] += s.total
+    stats[`${s.payment}Count`] += 1
 
     const p = products.get(s.productId) ?? { name: s.productName, qty: 0, total: 0 }
     p.qty += s.qty
@@ -70,10 +84,10 @@ export default function Dashboard() {
   const stats = useMemo(() => computeStats(sales), [sales])
   const lowStock = products.filter((p) => p.active && p.stock <= (p.threshold ?? 0))
 
-  function setPreset(daysBack, span = 1) {
-    const end = addDays(businessDay(), -daysBack)
-    setFrom(addDays(end, -(span - 1)))
-    setTo(end)
+  function applyPreset(preset) {
+    const range = presetRange(preset)
+    setFrom(range.from)
+    setTo(range.to)
   }
 
   async function cancelSale(sale) {
@@ -94,70 +108,83 @@ export default function Dashboard() {
   }
 
   return (
-    <section>
-      <div className="page-head">
-        <h1>Ventes</h1>
+    <section className="stack">
+      <div className="panel filters">
+        <div className="segmented" role="group" aria-label="Période">
+          {PRESETS.map((preset) => {
+            const range = presetRange(preset)
+            const active = range.from === from && range.to === to
+            return (
+              <button key={preset.label} className={active ? 'active' : ''} onClick={() => applyPreset(preset)}>
+                {preset.label}
+              </button>
+            )
+          })}
+        </div>
+        <div className="date-range">
+          <label htmlFor="period-from">Du</label>
+          <input
+            id="period-from"
+            className="input"
+            type="date"
+            value={from}
+            max={to}
+            onChange={(e) => setFrom(e.target.value)}
+          />
+          <label htmlFor="period-to">Au</label>
+          <input
+            id="period-to"
+            className="input"
+            type="date"
+            value={to}
+            min={from}
+            onChange={(e) => setTo(e.target.value)}
+          />
+        </div>
+        <span className="spacer" />
         <button className="btn" onClick={() => exportCsv(sales, from, to)} disabled={sales.length === 0}>
           Exporter CSV
         </button>
-      </div>
-
-      <div className="period">
-        <button className="btn small" onClick={() => setPreset(0)}>
-          Aujourd'hui
-        </button>
-        <button className="btn small" onClick={() => setPreset(1)}>
-          Hier
-        </button>
-        <button className="btn small" onClick={() => setPreset(0, 7)}>
-          7 jours
-        </button>
-        <label className="field inline">
-          <span>Du</span>
-          <input className="input" type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
-        </label>
-        <label className="field inline">
-          <span>Au</span>
-          <input className="input" type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
-        </label>
-        <span className="muted small-text">Une journée va de 4h à 4h le lendemain.</span>
+        <p className="filters-note">Une journée va de 4 h à 4 h le lendemain.</p>
       </div>
 
       {lowStock.length > 0 && (
-        <p className="alert warn">
-          Stock bas : {lowStock.map((p) => `${p.name} (${p.stock})`).join(', ')}.{' '}
+        <div className="alert warn">
+          <span className="alert-text">Stock bas : {lowStock.map((p) => `${p.name} (${p.stock})`).join(', ')}.</span>
           <Link to="/admin/produits">Réapprovisionner</Link>
-        </p>
+        </div>
       )}
       {error && <p className="alert error">Chargement impossible : {describeError(error)}</p>}
 
       <div className="stats">
-        <div className="stat">
-          <div className="stat-label">Total encaissé</div>
+        <div className="stat highlight">
+          <div className="label">Total encaissé</div>
           <div className="stat-value">{formatEuros(stats.total)}</div>
           <div className="stat-sub">
-            {stats.count} vente{stats.count > 1 ? 's' : ''} · {stats.units} article{stats.units > 1 ? 's' : ''}
+            {plural(stats.count, 'vente')} · {plural(stats.units, 'article')}
           </div>
         </div>
         <div className="stat">
-          <div className="stat-label">Carte</div>
+          <div className="label">Carte</div>
           <div className="stat-value">{formatEuros(stats.card)}</div>
+          <div className="stat-sub">{plural(stats.cardCount, 'vente')}</div>
         </div>
         <div className="stat">
-          <div className="stat-label">Espèces</div>
+          <div className="label">Espèces</div>
           <div className="stat-value">{formatEuros(stats.cash)}</div>
+          <div className="stat-sub">{plural(stats.cashCount, 'vente')}</div>
         </div>
       </div>
 
       {loading ? (
         <Spinner />
       ) : sales.length === 0 ? (
-        <p className="empty">Aucune vente sur cette période.</p>
+        <p className="panel empty">Aucune vente sur cette période.</p>
       ) : (
         <>
           <div className="grid-2">
-            <div className="panel">
-              <h2>Par produit</h2>
+            <div className="panel flush">
+              <h2 className="panel-title">Par produit</h2>
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -172,15 +199,15 @@ export default function Dashboard() {
                       <tr key={p.name}>
                         <td>{p.name}</td>
                         <td className="num">{p.qty}</td>
-                        <td className="num">{formatEuros(p.total)}</td>
+                        <td className="num strong">{formatEuros(p.total)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </div>
-            <div className="panel">
-              <h2>Par bénévole</h2>
+            <div className="panel flush">
+              <h2 className="panel-title">Par bénévole</h2>
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -206,8 +233,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="panel">
-            <h2>Détail des ventes</h2>
+          <div className="panel flush">
+            <h2 className="panel-title">Détail des ventes</h2>
             <div className="table-wrap">
               <table>
                 <thead>
@@ -216,7 +243,7 @@ export default function Dashboard() {
                     <th>Produit</th>
                     <th className="num">Qté</th>
                     <th className="num">Montant</th>
-                    <th>Paiement</th>
+                    <th className="center">Paiement</th>
                     <th>Bénévole</th>
                     <th />
                   </tr>
@@ -224,19 +251,19 @@ export default function Dashboard() {
                 <tbody>
                   {sales.map((s) => (
                     <tr key={s.id}>
-                      <td>
+                      <td className="muted">
                         {s.createdAt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}{' '}
                         {s.createdAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td>{s.productName}</td>
                       <td className="num">{s.qty}</td>
-                      <td className="num">{formatEuros(s.total)}</td>
-                      <td>
+                      <td className="num strong">{formatEuros(s.total)}</td>
+                      <td className="center">
                         <span className={`tag tag-${s.payment}`}>{PAYMENT_LABELS[s.payment]}</span>
                       </td>
                       <td>{s.volunteerName}</td>
                       <td className="num">
-                        <button className="btn small ghost danger" onClick={() => cancelSale(s)}>
+                        <button className="btn danger sm" onClick={() => cancelSale(s)}>
                           Annuler
                         </button>
                       </td>
