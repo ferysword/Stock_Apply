@@ -8,6 +8,8 @@ rules_version = '2';
 //   products/{id}       { name, price (centimes), stock, threshold, order, active, image, lastSaleId }
 //   sales/{id}          { productId, productName, unitPrice, qty, total, payment, createdAt, deviceId, volunteerName }
 //   closures/{day}      clôture d'une journée (4h -> 4h), calculée par l'interface admin
+//   invites/{token}     lien d'invitation gestionnaire { role, createdBy, createdAt, expiresAt, usedBy?, usedAt? }
+//   managers/{uid}      gestionnaire invité { name, email, invite, createdAt } : produits et vente uniquement
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -38,8 +40,18 @@ service cloud.firestore {
         && request.time < get(path).data.expiresAt;
     }
 
+    // Gestionnaire = compte créé via un lien d'invitation : produits et vente uniquement
+    function isManager() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/managers/$(request.auth.uid));
+    }
+
+    function isStaff() {
+      return isAdmin() || isManager();
+    }
+
     function isSeller() {
-      return isAdmin() || isVolunteer();
+      return isStaff() || isVolunteer();
     }
 
     // Une vente doit être accompagnée de la baisse de stock correspondante (même batch)
@@ -120,14 +132,53 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if isSeller();
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin() || (isVolunteer() && isSaleStockUpdate(productId));
+      allow create: if isStaff();
+      allow delete: if isAdmin();
+      allow update: if isStaff() || (isVolunteer() && isSaleStockUpdate(productId));
     }
 
     match /sales/{saleId} {
       allow read, delete: if isAdmin();
       allow create: if isSeller() && isValidSale(saleId);
       allow update: if false;
+    }
+
+    match /invites/{token} {
+      // Le jeton secret est l'identifiant : on lit une invitation dont on a le lien, sans pouvoir les lister
+      allow get: if true;
+      allow list, delete: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['role', 'createdBy', 'createdAt', 'expiresAt'])
+        && request.resource.data.role == 'manager'
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt <= request.time + duration.value(72, 'h');
+      // Usage unique, avant expiration, dans le même batch que la création du gestionnaire
+      allow update: if signedIn()
+        && !('usedBy' in resource.data)
+        && request.time < resource.data.expiresAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedBy', 'usedAt'])
+        && request.resource.data.usedBy == request.auth.uid
+        && request.resource.data.usedAt == request.time
+        && existsAfter(/databases/$(database)/documents/managers/$(request.auth.uid));
+    }
+
+    match /managers/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'email', 'invite', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.invite is string
+        && getAfter(/databases/$(database)/documents/invites/$(request.resource.data.invite)).data.usedBy == uid
+        && getAfter(/databases/$(database)/documents/invites/$(request.resource.data.invite)).data.usedAt == request.time;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     match /closures/{day} {

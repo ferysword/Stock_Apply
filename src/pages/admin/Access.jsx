@@ -3,15 +3,11 @@ import { QRCodeSVG } from 'qrcode.react'
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { describeError } from '../../lib/format'
+import { randomToken } from '../../lib/random'
 import { Spinner } from '../../components/Spinner'
 import Crest from '../../components/Crest'
 
 const time = (ts) => ts.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-
-function randomKey() {
-  const bytes = crypto.getRandomValues(new Uint8Array(24))
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
 
 export default function Access() {
   const [access, setAccess] = useState({ loading: true, key: null })
@@ -57,7 +53,7 @@ export default function Access() {
       return
     }
     try {
-      await setDoc(doc(db, 'private', 'access'), { key: randomKey(), updatedAt: serverTimestamp() })
+      await setDoc(doc(db, 'private', 'access'), { key: randomToken(), updatedAt: serverTimestamp() })
     } catch (err) {
       setError(describeError(err))
     }

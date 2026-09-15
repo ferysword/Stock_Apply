@@ -13,7 +13,7 @@ import Crest from '../components/Crest'
 export default function Join() {
   const { key } = useParams()
   const navigate = useNavigate()
-  const { loading, isAdmin } = useSession()
+  const { loading, isStaff } = useSession()
   const [identity, setIdentity] = useState(getVolunteerIdentity)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -21,7 +21,7 @@ export default function Join() {
   const day = businessDay()
 
   if (loading) return <FullPageSpinner />
-  if (isAdmin) return <Navigate to="/vente" replace />
+  if (isStaff) return <Navigate to="/vente" replace />
 
   const bind = (field) => ({
     value: identity[field],

@@ -21,14 +21,14 @@ function loginError(err) {
 }
 
 export default function AdminLogin() {
-  const { loading, user, isAdmin } = useSession()
+  const { loading, user, isStaff } = useSession()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState(null)
 
-  if (!loading && isAdmin) return <Navigate to="/admin" replace />
-  const notAdmin = !loading && user && !user.isAnonymous && !isAdmin
+  if (!loading && isStaff) return <Navigate to="/admin" replace />
+  const notAdmin = !loading && user && !user.isAnonymous && !isStaff
 
   async function submit(e) {
     e.preventDefault()
@@ -74,7 +74,7 @@ export default function AdminLogin() {
           {notAdmin && (
             <p className="alert error">
               <span className="alert-text">
-                Le compte {user.email} n'est pas administrateur.{' '}
+                Le compte {user.email} n'a pas accès à la gestion de la buvette.{' '}
                 <button type="button" className="link" onClick={() => signOut(auth)}>
                   Se déconnecter
                 </button>

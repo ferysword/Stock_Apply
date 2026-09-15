@@ -13,6 +13,7 @@ import { db } from '../../firebase'
 import { useProducts } from '../../lib/useProducts'
 import { centsToInput, describeError, formatEuros, parseEuros } from '../../lib/format'
 import { resizeImage } from '../../lib/image'
+import { useSession } from '../../lib/session'
 import { Spinner } from '../../components/Spinner'
 import ProductImage from '../../components/ProductImage'
 import StockBadge from '../../components/StockBadge'
@@ -22,6 +23,7 @@ const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`
 
 export default function Products() {
   const { products, loading, error } = useProducts()
+  const { isAdmin } = useSession()
   const [editing, setEditing] = useState(null) // null | 'new' | produit
   const [restocking, setRestocking] = useState(null)
   const [bulk, setBulk] = useState(false)
@@ -85,9 +87,11 @@ export default function Products() {
                 <button className="btn" onClick={() => setEditing(p)}>
                   Modifier
                 </button>
-                <button className="btn danger" onClick={() => remove(p)}>
-                  Supprimer
-                </button>
+                {isAdmin && (
+                  <button className="btn danger" onClick={() => remove(p)}>
+                    Supprimer
+                  </button>
+                )}
               </div>
             </div>
           ))}

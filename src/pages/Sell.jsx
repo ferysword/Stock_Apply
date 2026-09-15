@@ -14,10 +14,11 @@ import Modal from '../components/Modal'
 import Crest from '../components/Crest'
 
 export default function Sell() {
-  const { loading, user, isAdmin } = useSession()
+  const { loading, user, isAdmin, isStaff, staffName } = useSession()
   if (loading) return <FullPageSpinner />
   if (!user) return <Navigate to="/" replace />
-  return isAdmin ? <SellScreen user={user} volunteerName="Admin" /> : <VolunteerGate user={user} />
+  if (isStaff) return <SellScreen user={user} volunteerName={isAdmin ? 'Admin' : staffName} />
+  return <VolunteerGate user={user} />
 }
 
 function useNow(interval) {

@@ -4,10 +4,10 @@ import { FullPageSpinner } from '../components/Spinner'
 import Crest from '../components/Crest'
 
 export default function Home() {
-  const { loading, user, isAdmin } = useSession()
+  const { loading, user, isStaff } = useSession()
 
   if (loading) return <FullPageSpinner />
-  if (isAdmin) return <Navigate to="/admin" replace />
+  if (isStaff) return <Navigate to="/admin" replace />
   if (user?.isAnonymous) return <Navigate to="/vente" replace />
 
   return (

@@ -1,10 +1,12 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router'
 import { signOut } from 'firebase/auth'
 import { auth } from '../../firebase'
+import { useSession } from '../../lib/session'
 import Crest from '../../components/Crest'
 
 export default function AdminLayout() {
   const navigate = useNavigate()
+  const { isAdmin } = useSession()
 
   async function logout() {
     await signOut(auth)
@@ -17,15 +19,18 @@ export default function AdminLayout() {
         <div className="topbar-inner">
           <div className="brand">
             <Crest size={40} decorative />
-            <span>Buvette admin</span>
+            <span>{isAdmin ? 'Buvette admin' : 'Buvette gestion'}</span>
           </div>
           <nav className="tabs">
-            <NavLink end to="/admin">
-              Ventes
-            </NavLink>
-            <NavLink to="/admin/clotures">Clôtures</NavLink>
+            {isAdmin && (
+              <NavLink end to="/admin">
+                Ventes
+              </NavLink>
+            )}
+            {isAdmin && <NavLink to="/admin/clotures">Clôtures</NavLink>}
             <NavLink to="/admin/produits">Produits</NavLink>
-            <NavLink to="/admin/acces">Accès bénévoles</NavLink>
+            {isAdmin && <NavLink to="/admin/acces">Accès bénévoles</NavLink>}
+            {isAdmin && <NavLink to="/admin/equipe">Équipe</NavLink>}
           </nav>
           <div className="topbar-actions">
             <Link className="btn primary" to="/vente">

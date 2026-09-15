@@ -5,18 +5,27 @@ import { FullPageSpinner } from './components/Spinner'
 import Home from './pages/Home'
 import Join from './pages/Join'
 import Sell from './pages/Sell'
+import Invite from './pages/Invite'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
 import Products from './pages/admin/Products'
 import Access from './pages/admin/Access'
 import Closures from './pages/admin/Closures'
+import Team from './pages/admin/Team'
 
-function AdminGuard({ children }) {
-  const { loading, isAdmin } = useSession()
+// Espace de gestion : admins et gestionnaires invités
+function StaffGuard({ children }) {
+  const { loading, isStaff } = useSession()
   if (loading) return <FullPageSpinner />
-  if (!isAdmin) return <Navigate to="/admin/login" replace />
+  if (!isStaff) return <Navigate to="/admin/login" replace />
   return children
+}
+
+// Pages réservées aux admins : un gestionnaire est renvoyé vers les produits
+function AdminOnly({ children }) {
+  const { isAdmin } = useSession()
+  return isAdmin ? children : <Navigate to="/admin/produits" replace />
 }
 
 function SetupNotice() {
@@ -43,19 +52,49 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/b/:key" element={<Join />} />
           <Route path="/vente" element={<Sell />} />
+          <Route path="/invitation/:token" element={<Invite />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route
             path="/admin"
             element={
-              <AdminGuard>
+              <StaffGuard>
                 <AdminLayout />
-              </AdminGuard>
+              </StaffGuard>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="clotures" element={<Closures />} />
+            <Route
+              index
+              element={
+                <AdminOnly>
+                  <Dashboard />
+                </AdminOnly>
+              }
+            />
+            <Route
+              path="clotures"
+              element={
+                <AdminOnly>
+                  <Closures />
+                </AdminOnly>
+              }
+            />
             <Route path="produits" element={<Products />} />
-            <Route path="acces" element={<Access />} />
+            <Route
+              path="acces"
+              element={
+                <AdminOnly>
+                  <Access />
+                </AdminOnly>
+              }
+            />
+            <Route
+              path="equipe"
+              element={
+                <AdminOnly>
+                  <Team />
+                </AdminOnly>
+              }
+            />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
