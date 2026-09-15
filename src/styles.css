@@ -1737,6 +1737,51 @@ td.wrap {
   background: var(--mvb-primaire-fonce);
 }
 
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--mvb-bordure);
+}
+
+.confirm-line {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.confirm-amount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.confirm-amount strong {
+  font-family: var(--font-titre);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.confirm-amount .tag {
+  padding: 8px 16px;
+  font-size: 16px;
+}
+
+.confirm-hint {
+  font-size: 14px;
+  color: var(--mvb-texte-2);
+}
+
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 .sheet-note {
   margin-top: 12px;
   font-size: 12px;
@@ -1778,6 +1823,16 @@ td.wrap {
 
 .toast-success::before {
   background: var(--mvb-primaire);
+}
+
+.toast-info {
+  background: var(--mvb-texte);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(29, 29, 29, 0.2);
+}
+
+.toast-info::before {
+  background: var(--mvb-sombre-texte);
 }
 
 .toast-error {

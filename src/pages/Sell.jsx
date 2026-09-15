@@ -193,6 +193,10 @@ function SellScreen({ user, volunteerName, onQuit }) {
         <SaleSheet
           product={selected}
           onClose={() => setSelected(null)}
+          onCancel={() => {
+            setSelected(null)
+            setToast({ type: 'info', text: 'Vente annulée · rien n’a été enregistré' })
+          }}
           onConfirm={(qty, payment) => sell(selected, qty, payment)}
         />
       )}
@@ -206,8 +210,10 @@ function SellScreen({ user, volunteerName, onQuit }) {
   )
 }
 
-function SaleSheet({ product, onClose, onConfirm }) {
+// Choix quantité + paiement, puis récap à valider : rien n'est enregistré avant « Valider la vente »
+function SaleSheet({ product, onClose, onCancel, onConfirm }) {
   const [qty, setQty] = useState(1)
+  const [payment, setPayment] = useState(null)
 
   return (
     <Modal label={product.name} onClose={onClose} sheet>
@@ -222,38 +228,69 @@ function SaleSheet({ product, onClose, onConfirm }) {
         </button>
       </div>
 
-      <div className="stepper">
-        <button onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} aria-label="Moins">
-          −
-        </button>
-        <output aria-live="polite">{qty}</output>
-        <button className="plus" onClick={() => setQty((q) => Math.min(99, q + 1))} aria-label="Plus">
-          +
-        </button>
-      </div>
-
-      <div className="quick">
-        {[1, 2, 3, 4, 5, 6].map((n) => (
-          <button key={n} className={n === qty ? 'active' : ''} onClick={() => setQty(n)}>
-            {n}
+      {payment ? (
+        <div className="confirm">
+          <span className="label">Confirmer la vente</span>
+          <div className="confirm-line">
+            {qty} × {product.name}
+          </div>
+          <div className="confirm-amount">
+            <strong>{formatEuros(qty * product.price)}</strong>
+            <span className={`tag tag-${payment}`}>{PAYMENT_LABELS[payment]}</span>
+          </div>
+          <p className="confirm-hint">
+            {payment === 'card'
+              ? 'Attends que le paiement carte soit accepté, puis valide.'
+              : 'Encaisse la monnaie, puis valide.'}
+          </p>
+          <button className="btn primary xl block" onClick={() => onConfirm(qty, payment)}>
+            Valider la vente
           </button>
-        ))}
-      </div>
+          <div className="confirm-actions">
+            <button className="btn lg" onClick={() => setPayment(null)}>
+              Modifier
+            </button>
+            <button className="btn danger lg" onClick={onCancel}>
+              Annuler la vente
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="stepper">
+            <button onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} aria-label="Moins">
+              −
+            </button>
+            <output aria-live="polite">{qty}</output>
+            <button className="plus" onClick={() => setQty((q) => Math.min(99, q + 1))} aria-label="Plus">
+              +
+            </button>
+          </div>
 
-      <div className="sheet-total">
-        <span>Total</span>
-        <strong>{formatEuros(qty * product.price)}</strong>
-      </div>
+          <div className="quick">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <button key={n} className={n === qty ? 'active' : ''} onClick={() => setQty(n)}>
+                {n}
+              </button>
+            ))}
+          </div>
 
-      <div className="pay">
-        <button className="pay-card" onClick={() => onConfirm(qty, 'card')}>
-          Carte
-        </button>
-        <button className="pay-cash" onClick={() => onConfirm(qty, 'cash')}>
-          Espèces
-        </button>
-      </div>
-      <p className="sheet-note">Un appui enregistre la vente.</p>
+          <div className="sheet-total">
+            <span>Total</span>
+            <strong>{formatEuros(qty * product.price)}</strong>
+          </div>
+
+          <div className="pay">
+            <button className="pay-card" onClick={() => setPayment('card')}>
+              Carte
+            </button>
+            <button className="pay-cash" onClick={() => setPayment('cash')}>
+              Espèces
+            </button>
+          </div>
+          <p className="sheet-note">Tu valideras la vente à l'étape suivante.</p>
+        </>
+      )}
     </Modal>
   )
 }
