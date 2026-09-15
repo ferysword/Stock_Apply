@@ -162,12 +162,16 @@ test('accès coupé à la fin de la journée (4h)', async () => {
   await assertFails(sell(db, 'vol'))
 })
 
-test('un bénévole qui quitte retire son téléphone, pas celui des autres', async () => {
+test('un bénévole qui quitte note son départ, sans toucher aux autres ni prolonger son accès', async () => {
   await join(volunteerDb('autre'), 'autre')
   const db = volunteerDb()
   await join(db, 'vol')
-  await assertFails(deleteDoc(doc(db, 'devices/autre')))
-  await assertSucceeds(deleteDoc(doc(db, 'devices/vol')))
+  const leave = { leftAt: serverTimestamp(), expiresAt: serverTimestamp() }
+  await assertFails(updateDoc(doc(db, 'devices/autre'), leave))
+  await assertFails(updateDoc(doc(db, 'devices/vol'), { leftAt: serverTimestamp(), expiresAt: hoursFromNow(10) }))
+  await assertFails(updateDoc(doc(db, 'devices/vol'), { ...leave, firstName: 'Autre' }))
+  await assertFails(deleteDoc(doc(db, 'devices/vol')))
+  await assertSucceeds(updateDoc(doc(db, 'devices/vol'), leave))
   await assertFails(sell(db, 'vol'))
 })
 

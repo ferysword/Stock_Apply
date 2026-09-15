@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { signOut } from 'firebase/auth'
-import { collection, deleteDoc, doc, increment, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore'
+import { collection, doc, increment, onSnapshot, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { useSession } from '../lib/session'
 import { useProducts } from '../lib/useProducts'
@@ -33,6 +33,7 @@ function useNow(interval) {
 function VolunteerGate({ user }) {
   const navigate = useNavigate()
   const [device, setDevice] = useState({ loading: true, data: null })
+  const [leaving, setLeaving] = useState(false)
   const now = useNow(30_000)
 
   useEffect(
@@ -45,15 +46,21 @@ function VolunteerGate({ user }) {
     [user.uid],
   )
 
-  async function quit() {
-    // Retire le téléphone pour qu'il n'apparaisse plus « Actif » côté admin (sans bloquer si hors réseau)
-    const removal = deleteDoc(doc(db, 'devices', user.uid)).catch(() => {})
-    await Promise.race([removal, new Promise((resolve) => setTimeout(resolve, 3000))])
+  async function quit(markLeft) {
+    setLeaving(true)
+    if (markLeft) {
+      // Coupe l'accès et affiche « Déconnecté » côté admin (sans bloquer si hors réseau)
+      const leave = updateDoc(doc(db, 'devices', user.uid), {
+        leftAt: serverTimestamp(),
+        expiresAt: serverTimestamp(),
+      }).catch(() => {})
+      await Promise.race([leave, new Promise((resolve) => setTimeout(resolve, 3000))])
+    }
     await signOut(auth)
     navigate('/', { replace: true })
   }
 
-  if (device.loading) return <FullPageSpinner />
+  if (device.loading || leaving) return <FullPageSpinner />
 
   const expired = !device.data || device.data.expiresAt.toMillis() <= now
   if (expired) {
@@ -63,7 +70,7 @@ function VolunteerGate({ user }) {
         <h1>{device.data ? 'Journée terminée' : 'Accès non valide'}</h1>
         <div className="bar" />
         <p>Scanne le QR code de la buvette pour commencer une nouvelle journée.</p>
-        <button className="btn primary" onClick={quit}>
+        <button className="btn primary" onClick={() => quit(false)}>
           Fermer
         </button>
       </main>
@@ -71,7 +78,7 @@ function VolunteerGate({ user }) {
   }
 
   const { firstName, lastName } = device.data
-  return <SellScreen user={user} volunteerName={`${firstName} ${lastName}`} onQuit={quit} />
+  return <SellScreen user={user} volunteerName={`${firstName} ${lastName}`} onQuit={() => quit(true)} />
 }
 
 function SellScreen({ user, volunteerName, onQuit }) {

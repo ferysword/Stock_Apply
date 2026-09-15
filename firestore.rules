@@ -3,7 +3,7 @@ rules_version = '2';
 // Collections :
 //   admins/{uid}        compte admin (créé à la main dans la console Firebase)
 //   private/access      { key } clé secrète contenue dans le QR code bénévoles
-//   devices/{uid}       téléphone bénévole du jour { key, firstName, lastName, day, createdAt, expiresAt }
+//   devices/{uid}       téléphone bénévole du jour { key, firstName, lastName, day, createdAt, expiresAt, leftAt? }
 //   shifts/{id}         présence : un document par scan du QR code { uid, firstName, lastName, day, createdAt }
 //   products/{id}       { name, price (centimes), stock, threshold, order, active, image, lastSaleId }
 //   sales/{id}          { productId, productName, unitPrice, qty, total, payment, createdAt, deviceId, volunteerName }
@@ -96,8 +96,13 @@ service cloud.firestore {
         && request.resource.data.expiresAt is timestamp
         && request.resource.data.expiresAt > request.time
         && request.resource.data.expiresAt <= request.time + duration.value(25, 'h');
-      // Le bénévole supprime son propre téléphone quand il quitte l'appli
-      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      // « Quitter » : le bénévole note son départ, ce qui coupe son accès ; le téléphone reste visible côté admin
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftAt', 'expiresAt'])
+        && request.resource.data.leftAt == request.time
+        && request.resource.data.expiresAt == request.time;
+      allow delete: if isAdmin();
     }
 
     match /shifts/{shiftId} {

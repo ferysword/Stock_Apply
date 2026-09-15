@@ -6,6 +6,8 @@ import { describeError } from '../../lib/format'
 import { Spinner } from '../../components/Spinner'
 import Crest from '../../components/Crest'
 
+const time = (ts) => ts.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+
 function randomKey() {
   const bytes = crypto.getRandomValues(new Uint8Array(24))
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -45,7 +47,7 @@ export default function Access() {
   const joinUrl = access.key ? `${window.location.origin}${window.location.pathname}#/b/${access.key}` : ''
   const now = Date.now()
   const isActive = (d) => d.key === access.key && d.expiresAt?.toMillis() > now
-  const expired = devices.filter((d) => !isActive(d))
+  const inactive = devices.filter((d) => !isActive(d))
 
   async function regenerate() {
     if (
@@ -72,9 +74,9 @@ export default function Access() {
     await deleteDoc(doc(db, 'devices', device.id))
   }
 
-  async function purgeExpired() {
+  async function purgeInactive() {
     const batch = writeBatch(db)
-    expired.slice(0, 500).forEach((d) => batch.delete(doc(db, 'devices', d.id)))
+    inactive.slice(0, 500).forEach((d) => batch.delete(doc(db, 'devices', d.id)))
     await batch.commit()
   }
 
@@ -120,9 +122,9 @@ export default function Access() {
           <div className="panel flush">
             <div className="panel-head">
               <h2>Téléphones connectés</h2>
-              {expired.length > 0 && (
-                <button className="btn" onClick={purgeExpired}>
-                  Nettoyer les expirés ({expired.length})
+              {inactive.length > 0 && (
+                <button className="btn" onClick={purgeInactive}>
+                  Nettoyer les inactifs ({inactive.length})
                 </button>
               )}
             </div>
@@ -149,7 +151,13 @@ export default function Access() {
                           {d.createdAt?.toDate().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
                         </td>
                         <td>
-                          {isActive(d) ? <span className="tag tag-ok">Actif</span> : <span className="tag">Expiré</span>}
+                          {d.leftAt ? (
+                            <span className="tag tag-outline">Déconnecté à {time(d.leftAt)}</span>
+                          ) : isActive(d) ? (
+                            <span className="tag tag-ok">Actif</span>
+                          ) : (
+                            <span className="tag">Expiré</span>
+                          )}
                         </td>
                         <td className="num">
                           <button className="btn danger sm" onClick={() => revoke(d)}>
