@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { signOut } from 'firebase/auth'
-import { collection, doc, increment, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore'
+import { collection, deleteDoc, doc, increment, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { useSession } from '../lib/session'
 import { useProducts } from '../lib/useProducts'
@@ -46,6 +46,9 @@ function VolunteerGate({ user }) {
   )
 
   async function quit() {
+    // Retire le téléphone pour qu'il n'apparaisse plus « Actif » côté admin (sans bloquer si hors réseau)
+    const removal = deleteDoc(doc(db, 'devices', user.uid)).catch(() => {})
+    await Promise.race([removal, new Promise((resolve) => setTimeout(resolve, 3000))])
     await signOut(auth)
     navigate('/', { replace: true })
   }

@@ -6,6 +6,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebas
 import {
   Timestamp,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -158,6 +159,15 @@ test('accès coupé à la fin de la journée (4h)', async () => {
   const db = volunteerDb()
   await join(db, 'vol')
   await asRoot((root) => updateDoc(doc(root, 'devices/vol'), { expiresAt: hoursFromNow(-1) }))
+  await assertFails(sell(db, 'vol'))
+})
+
+test('un bénévole qui quitte retire son téléphone, pas celui des autres', async () => {
+  await join(volunteerDb('autre'), 'autre')
+  const db = volunteerDb()
+  await join(db, 'vol')
+  await assertFails(deleteDoc(doc(db, 'devices/autre')))
+  await assertSucceeds(deleteDoc(doc(db, 'devices/vol')))
   await assertFails(sell(db, 'vol'))
 })
 
